@@ -1,3 +1,6 @@
 attrs = { "class" : "support", "tabindex": 1, "xyu": "medved"}
-arr = list(attrs.values())
-print(arr)
+result = []
+for i in attrs:
+        result.append([i])
+print(result)
+print([[i] for i in attrs])
