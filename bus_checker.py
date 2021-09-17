@@ -1,12 +1,14 @@
 import requests
+import schedule
+import time
 from bs4 import BeautifulSoup
 import re
 import sys
 import pyexcel
-from pyexcel_ods import save_data
 from collections import OrderedDict
 from datetime import datetime
 import os.path
+import os
 
 def main():
     data_processing(request_html())
@@ -58,23 +60,43 @@ def data_processing(response):
     soup = BeautifulSoup(response.text, 'lxml')
     tickets_list = soup.find_all("div" , attrs = { "class" : "tickets"})
 
+    depature_date = re.match(r'[\d-]*', tickets_list[0].find("input", attrs = { "class" : "tripVariant"})["value"]).group(0)
+    print(f"{datetime.now().strftime('%H:%M:%S')} Check!")
     for ticket in tickets_list:
         depature_time = ticket["data-time"]
-        depature_date = re.match(r'[\d-]*', ticket.find("input", attrs = { "class" : "tripVariant"})["value"]).group(0)
+        #Сделать глобальным
         if(ticket["data-status"] == "ok"):
             seat = ticket["data-seats"]
-            print(seat)
             schedule_times[depature_time] = seat;
     schedule_times.update({"check_time": datetime.now().strftime('%H:%M:%S')})
 
+    book = None
     # Если нет файла, создаем и добавляем в него полученную информацию
     if not os.path.isfile('bus_analytics.ods'):
-        data = OrderedDict()
-        data.update({depature_date: [[time] for time in schedule_times]})
-        save_data("bus_analytics.ods", data)
-
-    book = pyexcel.get_book(file_name="bus_analytics.ods")
-    book[depature_date].column += list(schedule_times.values())
+        book = pyexcel.Book({depature_date: [[time] for time in schedule_times]})
+    else:
+        book = pyexcel.get_book(file_name="bus_analytics.ods")
+    if not (depature_date in book.sheet_names()):
+        sheet = pyexcel.Sheet([[time] for time in schedule_times])
+        sheet.name = depature_date
+        book += sheet
+    book[depature_date].column += list(schedule_times.values())   
     book.save_as("bus_analytics.ods")
 
+def start_script():
+    print(f"{datetime.now().strftime('%H:%M:%S')} Start working")
+    schedule.every(1).minutes.until("23:30").do(main)
+
+while not((datetime.now().minute % 10) % 9 == 0):
+    time.sleep(10)
+
+print((datetime.now().minute % 10) % 9)
+print(datetime.now().minute)
 main()
+
+schedule.every(10).minutes.until("23:30").do(main)
+schedule.every().day.at("15:08").do(start_script)
+
+while True:
+    schedule.run_pending()
+    time.sleep(1)
