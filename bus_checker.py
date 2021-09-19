@@ -1,14 +1,27 @@
+import pytz 
 import requests
-import schedule
 import time
 from bs4 import BeautifulSoup
 import re
 import sys
 import pyexcel
-from collections import OrderedDict
 from datetime import datetime
 import os.path
-import os
+import logging
+
+logger = logging.getLogger("bus")
+logger.setLevel(logging.INFO)
+    
+# create the logging file handler
+fh = logging.FileHandler("bus.log", mode='w')
+
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(message)s - %(levelname)s')
+fh.setFormatter(formatter)
+
+# add handler to logger object
+logger.addHandler(fh)
+
+time_zone_KRA = pytz.timezone('Asia/Krasnoyarsk') 
 
 def main():
     data_processing(request_html())
@@ -31,7 +44,7 @@ def request_html():
         "upgrade-insecure-requests": "1",
         "user-agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.135 YaBrowser/21.6.2.817 (beta) Yowser/2.5 Safari/537.36"
         }
-    response = requests.get(f"https://na-avtobus.ru/raspisanie/kya/krasnoyarsk-zhd/kya/zheleznogorsk/{datetime.now().strftime('%Y-%m-%d')}", headers)
+    response = requests.get(f"https://na-avtobus.ru/raspisanie/kya/krasnoyarsk-zhd/kya/zheleznogorsk/{datetime.now(time_zone_KRA).strftime('%Y-%m-%d')}", headers)
 
     # Проверяем статус ответа
     if(response.status_code != 200):
@@ -39,64 +52,48 @@ def request_html():
     return response
 
 def data_processing(response):
-    # Получаем данные каждой доступной поездки, места, время. Записываем с ключем времени в словарь schedule_times количество свободных мест
-    schedule_times = {
-        "07:40": None,
-        "08:20": None,
-        "09:10": None,
-        "10:10": None,
-        "11:30": None,
-        "12:20": None,
-        "13:10": None,
-        "14:50": None,
-        "16:30": None,
-        "17:10": None,
-        "17:50": None,
-        "18:30": None,
-        "19:10": None,
-        "20:30": None,
-        "23:00": None
-    }
+
+    # Подготавливаем файл для записи
     soup = BeautifulSoup(response.text, 'lxml')
     tickets_list = soup.find_all("div" , attrs = { "class" : "tickets"})
-
+    schedule_times = {}
+    book = None
+    print(response.text)
     depature_date = re.match(r'[\d-]*', tickets_list[0].find("input", attrs = { "class" : "tripVariant"})["value"]).group(0)
-    print(f"{datetime.now().strftime('%H:%M:%S')} Check!")
+    if os.path.isfile('bus_analytics.ods'):
+        book = pyexcel.get_book(file_name="bus_analytics.ods")
+        print(book.sheet_names())
+        print(f" Normal? {depature_date}")
+        print(depature_date in book.sheet_names())
+        if depature_date in book.sheet_names():
+            schedule_times = book[depature_date].column_at(1)
+            print(schedule_times)
+    # Получаем данные каждой доступной поездки, места, время. Записываем с ключем времени в словарь schedule_times количество свободных мест
+    print(f"{datetime.now(time_zone_KRA).strftime('%H:%M:%S')} Check!")
     for ticket in tickets_list:
         depature_time = ticket["data-time"]
         #Сделать глобальным
         if(ticket["data-status"] == "ok"):
             seat = ticket["data-seats"]
             schedule_times[depature_time] = seat;
-    schedule_times.update({"check_time": datetime.now().strftime('%H:%M:%S')})
+    logger.info(f"Dep.date: {depature_time} Check!")
+    schedule_times.update({"check_time": datetime.now(time_zone_KRA).strftime('%H:%M:%S')})
 
-    book = None
-    # Если нет файла, создаем и добавляем в него полученную информацию
+    # Добавляем в него полученную информацию
     if not os.path.isfile('bus_analytics.ods'):
+        logger.info("Creating file bus_analytics.ods")
         book = pyexcel.Book({depature_date: [[time] for time in schedule_times]})
-    else:
-        book = pyexcel.get_book(file_name="bus_analytics.ods")
+        logger.info(book)
+
     if not (depature_date in book.sheet_names()):
+        logger.info("Creating new sheet in file")
         sheet = pyexcel.Sheet([[time] for time in schedule_times])
+        loger.info(f"New sheet: {sheet}")
         sheet.name = depature_date
         book += sheet
+        loger.info(f"Finaly book: f{book}")
     book[depature_date].column += list(schedule_times.values())   
     book.save_as("bus_analytics.ods")
 
-def start_script():
-    print(f"{datetime.now().strftime('%H:%M:%S')} Start working")
-    schedule.every(1).minutes.until("23:30").do(main)
 
-while not((datetime.now().minute % 10) % 9 == 0):
-    time.sleep(10)
-
-print((datetime.now().minute % 10) % 9)
-print(datetime.now().minute)
 main()
-
-schedule.every(10).minutes.until("23:30").do(main)
-schedule.every().day.at("15:08").do(start_script)
-
-while True:
-    schedule.run_pending()
-    time.sleep(1)
