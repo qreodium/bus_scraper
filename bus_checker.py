@@ -14,12 +14,12 @@ config = configparser.ConfigParser()
 config.read("config.ini")
 
 logger = logging.getLogger("bus")
-logger.setLevel(logging.INFO)
+logger.setLevel(logging.DEBUG)
     
 # create the logging file handler
 fh = logging.FileHandler("bus.log", mode='w')
 
-formatter = logging.Formatter('%(asctime)s - %(name)s - %(message)s - %(levelname)s')
+formatter = logging.Formatter('%(message)s - %(levelname)s')
 fh.setFormatter(formatter)
 
 # add handler to logger object
@@ -62,7 +62,7 @@ def get_schedule(tickets_list):
         if depature_date in book.sheet_names():
             writen_time = [value for value in book[depature_date].column_at(0) if value][:-1]
             schedule_times = {}.fromkeys(writen_time, None)
-            logger.info(f"Load schedule: {schedule_times}")
+            logger.debug(f"{datetime.now(time_zone_KRA).strftime('%D %H:%M:%S')} Load schedule: {schedule_times}")
             return schedule_times
     else:
         schedule_times = {}
@@ -72,37 +72,29 @@ def get_schedule(tickets_list):
 
 def get_depature_date(tickets_list):
     raw_date = tickets_list[0].find("p", attrs = { "class" : "trip_head-data"}).get_text()
-    return re.search(r'\d+\s\w+', raw_data).group(0)
+    return re.search(r'\d+\s\w+', raw_date).group(0)
 
 def save_data(depature_date, schedule_times):
-    if not os.path.isfile(config.get("Settings", "spreadsheet_filename")):
-        logger.info("Creating file bus_analytics.ods")
-        book = pyexcel.Book({depature_date: [[time] for time in schedule_times]})
-        logger.info(book)
+    book = None
+    if os.path.isfile(config.get("Settings", "spreadsheet_filename")):
+        book = pyexcel.get_book(file_name=config.get("Settings", "spreadsheet_filename"))
     else:
-        
+        logger.debug(f"{datetime.now(time_zone_KRA).strftime('%D %H:%M:%S')} Creating file bus_analytics.ods")
+        book = pyexcel.Book({depature_date: [[time] for time in schedule_times]})
+        logger.debug(book)
 
     if not (depature_date in book.sheet_names()):
-        logger.info("Creating new sheet in file")
+        logger.debug(f"{datetime.now(time_zone_KRA).strftime('%D %H:%M:%S')} Creating new sheet in file")
         sheet = pyexcel.Sheet([[time] for time in schedule_times])
-        logger.info(f"New sheet: {sheet}")
         sheet.name = depature_date
+        logger.debug(f"{datetime.now(time_zone_KRA).strftime('%D %H:%M:%S')} New sheet: {sheet}")
         book += sheet
-        logger.info(f"Finaly book: f{book}")
+        logger.debug(f"{datetime.now(time_zone_KRA).strftime('%D %H:%M:%S')} Finaly book: f{book}")
     book[depature_date].column += list(schedule_times.values())   
     book.save_as(config.get("Settings", "spreadsheet_filename"))
 
-def data_processing(response):
-
-    # Подготавливаем файл для записи
-    soup = BeautifulSoup(response.text, 'lxml')
-    tickets_list = soup.find_all("div" , attrs = { "class" : "tickets"})
-    book = None
-    depature_date = get_depature_date(tickets_list)
-    schedule_times = get_schedule(tickets_list)
-    print(f"Times: {schedule_times}")
-    # Получаем данные каждой доступной поездки, места, время. Записываем с ключем времени в словарь schedule_times количество свободных мест
-    print(f"{datetime.now(time_zone_KRA).strftime('%H:%M:%S')} Check!")
+def fill_schedule(schedule_times, tickets_list):
+    print(f"{datetime.now(time_zone_KRA).strftime('%D %H:%M:%S')} Check!")
     for ticket in tickets_list:
         depature_time = ticket["data-time"]
         #Сделать глобальным
@@ -110,11 +102,24 @@ def data_processing(response):
             seat = ticket["data-seats"]
             if depature_time in schedule_times:
                 schedule_times[depature_time] = seat;
-    logger.info(f"Dep.date: {depature_time} Check!")
+    logger.debug(f"{datetime.now(time_zone_KRA).strftime('%D %H:%M:%S')} Dep.date: {depature_time}  Check!")
     schedule_times.update({"check_time": datetime.now(time_zone_KRA).strftime('%H:%M:%S')})
+    return schedule_times
+
+def data_processing(response):
+    # Подготавливаем файл для записи
+    soup = BeautifulSoup(response.text, 'lxml')
+    tickets_list = soup.find_all("div" , attrs = { "class" : "tickets"})
+    depature_date = get_depature_date(tickets_list)
+    schedule_times = get_schedule(tickets_list)
+    schedule_times = fill_schedule(schedule_times, tickets_list)
+    print(f"Times: {schedule_times}")
+
+    # Получаем данные каждой доступной поездки, места, время. Записываем с ключем времени в словарь schedule_times количество свободных мест
+
 
     # Добавляем в него полученную информацию
-
+    save_data(depature_date, schedule_times)
 
 
 main()
