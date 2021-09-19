@@ -8,6 +8,10 @@ import pyexcel
 from datetime import datetime
 import os.path
 import logging
+import configparser
+
+config = configparser.ConfigParser()
+config.read("config.ini")
 
 logger = logging.getLogger("bus")
 logger.setLevel(logging.INFO)
@@ -48,26 +52,55 @@ def request_html():
 
     # Проверяем статус ответа
     if(response.status_code != 200):
-        sys.exit(f"Error! The server did not send the necessary data. Response status code:{response.status_code}")
+        logger.error(f"Error! The server did not send the necessary data. Response status code:{response.status_code}")
     return response
+
+def get_schedule(tickets_list):
+    depature_date = re.search(r'\d+\s\w+', tickets_list[0].find("p", attrs = { "class" : "trip_head-data"}).get_text()).group(0)
+    if os.path.isfile(config.get("Settings", "spreadsheet_filename")):
+        book = pyexcel.get_book(file_name=config.get("Settings", "spreadsheet_filename"))
+        if depature_date in book.sheet_names():
+            writen_time = [value for value in book[depature_date].column_at(0) if value][:-1]
+            schedule_times = {}.fromkeys(writen_time, None)
+            logger.info(f"Load schedule: {schedule_times}")
+            return schedule_times
+    else:
+        schedule_times = {}
+        for ticket in tickets_list:
+            schedule_times.update({ticket["data-time"]: None})
+        return schedule_times
+
+def get_depature_date(tickets_list):
+    raw_date = tickets_list[0].find("p", attrs = { "class" : "trip_head-data"}).get_text()
+    return re.search(r'\d+\s\w+', raw_data).group(0)
+
+def save_data(depature_date, schedule_times):
+    if not os.path.isfile(config.get("Settings", "spreadsheet_filename")):
+        logger.info("Creating file bus_analytics.ods")
+        book = pyexcel.Book({depature_date: [[time] for time in schedule_times]})
+        logger.info(book)
+    else:
+        
+
+    if not (depature_date in book.sheet_names()):
+        logger.info("Creating new sheet in file")
+        sheet = pyexcel.Sheet([[time] for time in schedule_times])
+        logger.info(f"New sheet: {sheet}")
+        sheet.name = depature_date
+        book += sheet
+        logger.info(f"Finaly book: f{book}")
+    book[depature_date].column += list(schedule_times.values())   
+    book.save_as(config.get("Settings", "spreadsheet_filename"))
 
 def data_processing(response):
 
     # Подготавливаем файл для записи
     soup = BeautifulSoup(response.text, 'lxml')
     tickets_list = soup.find_all("div" , attrs = { "class" : "tickets"})
-    schedule_times = {}
     book = None
-    print(response.text)
-    depature_date = re.match(r'[\d-]*', tickets_list[0].find("input", attrs = { "class" : "tripVariant"})["value"]).group(0)
-    if os.path.isfile('bus_analytics.ods'):
-        book = pyexcel.get_book(file_name="bus_analytics.ods")
-        print(book.sheet_names())
-        print(f" Normal? {depature_date}")
-        print(depature_date in book.sheet_names())
-        if depature_date in book.sheet_names():
-            schedule_times = book[depature_date].column_at(1)
-            print(schedule_times)
+    depature_date = get_depature_date(tickets_list)
+    schedule_times = get_schedule(tickets_list)
+    print(f"Times: {schedule_times}")
     # Получаем данные каждой доступной поездки, места, время. Записываем с ключем времени в словарь schedule_times количество свободных мест
     print(f"{datetime.now(time_zone_KRA).strftime('%H:%M:%S')} Check!")
     for ticket in tickets_list:
@@ -75,25 +108,13 @@ def data_processing(response):
         #Сделать глобальным
         if(ticket["data-status"] == "ok"):
             seat = ticket["data-seats"]
-            schedule_times[depature_time] = seat;
+            if depature_time in schedule_times:
+                schedule_times[depature_time] = seat;
     logger.info(f"Dep.date: {depature_time} Check!")
     schedule_times.update({"check_time": datetime.now(time_zone_KRA).strftime('%H:%M:%S')})
 
     # Добавляем в него полученную информацию
-    if not os.path.isfile('bus_analytics.ods'):
-        logger.info("Creating file bus_analytics.ods")
-        book = pyexcel.Book({depature_date: [[time] for time in schedule_times]})
-        logger.info(book)
 
-    if not (depature_date in book.sheet_names()):
-        logger.info("Creating new sheet in file")
-        sheet = pyexcel.Sheet([[time] for time in schedule_times])
-        loger.info(f"New sheet: {sheet}")
-        sheet.name = depature_date
-        book += sheet
-        loger.info(f"Finaly book: f{book}")
-    book[depature_date].column += list(schedule_times.values())   
-    book.save_as("bus_analytics.ods")
 
 
 main()
