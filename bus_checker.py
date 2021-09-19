@@ -121,5 +121,13 @@ def data_processing(response):
     # Добавляем в него полученную информацию
     save_data(depature_date, schedule_times)
 
-
-main()
+while True:
+    if datetime.now(time_zone_KRA).hour == 23:
+        logger.info("23 hours, waiting...")
+        time.sleep(7*60*60)
+        logger.info("Wake up an start working.")
+        
+    while not(datetime.now(time_zone_KRA).minute % 10== 9):
+        time.sleep(20)
+    main()
+    time.sleep(9*60)
