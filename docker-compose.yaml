@@ -1,0 +1,7 @@
+version: '2.1'
+
+services:
+  bus_app:
+    build: .
+    volumes:
+      - /srv/bus_data:/app/data

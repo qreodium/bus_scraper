@@ -11,8 +11,12 @@ import logging
 import configparser
 
 def main():
-    data_processing(request_html(f"https://na-avtobus.ru/raspisanie/kya/krasnoyarsk-zhd/kya/zheleznogorsk/{datetime.now(time_zone_KRA).strftime('%Y-%m-%d')}"),config.get("Settings", "Kra-Zhe_filename"))
-    data_processing(request_html(f"https://na-avtobus.ru/raspisanie/kya/zheleznogorsk/kya/krasnoyarsk-zhd/{datetime.now(time_zone_KRA).strftime('%Y-%m-%d')}"),config.get("Settings", "Zhe-Kra_filename"))
+    data_processing(
+        request_html(f"https://na-avtobus.ru/raspisanie/kya/krasnoyarsk-zhd/kya/zheleznogorsk/{datetime.now(time_zone_KRA).strftime('%Y-%m-%d')}"),
+        config.get("Settings", "Kra-Zhe_filename"))
+    data_processing(
+        request_html(f"https://na-avtobus.ru/raspisanie/kya/zheleznogorsk/kya/krasnoyarsk-zhd/{datetime.now(time_zone_KRA).strftime('%Y-%m-%d')}"),
+        config.get("Settings", "Zhe-Kra_filename"))
 
 def request_html(url):
     # Отправляем запрос
@@ -42,6 +46,7 @@ def request_html(url):
 def get_schedule(tickets_list, spreadsheet_filename):
     depature_date = re.search(r'\d+\s\w+', tickets_list[0].find("p", attrs = { "class" : "trip_head-data"}).get_text()).group(0)
     logger.debug(f"{datetime.now(time_zone_KRA).strftime('%D %H:%M:%S')} Loading or create schedule for tickets: {len(tickets_list)}")
+    # Если есть spreadsheet, берем расписание из него. Иначе создаем из полученных билетов
     if os.path.isfile(spreadsheet_filename):
         book = pyexcel.get_book(file_name=spreadsheet_filename)
         if depature_date in book.sheet_names():
@@ -96,21 +101,18 @@ def data_processing(response, spreadsheet_filename):
     # Подготавливаем файл для записи
     soup = BeautifulSoup(response.text, 'lxml')
     tickets_list = soup.find_all("div" , attrs = { "class" : "tickets"})
+
     if tickets_list: 
         depature_date = get_depature_date(tickets_list)
         schedule_times = get_schedule(tickets_list, spreadsheet_filename)
         logger.debug(f"This schedule: {schedule_times}")
         schedule_times = fill_schedule(schedule_times, tickets_list)
         print(f"Times: {schedule_times}")
+        save_data(depature_date, schedule_times, spreadsheet_filename)
     else:
         print(f"No tickets")
         logger.debug(f"{datetime.now(time_zone_KRA).strftime('%D %H:%M:%S')} None tickets_list!")
 
-    # Получаем данные каждой доступной поездки, места, время. Записываем с ключем времени в словарь schedule_times количество свободных мест
-
-
-    # Добавляем в него полученную информацию
-    save_data(depature_date, schedule_times, spreadsheet_filename)
 
 if __name__ == "__main__":
     config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
