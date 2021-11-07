@@ -129,14 +129,15 @@ def data_processing(response, spreadsheet_filename):
     # Добавляем в него полученную информацию
     save_data(depature_date, schedule_times, spreadsheet_filename)
 
-main()
-while True:
-    if datetime.now(time_zone_KRA).hour == 23:
-        logger.info("23 hours, waiting...")
-        time.sleep(7*60*60)
-        logger.info("Wake up an start working.")
-        
-    while not(datetime.now(time_zone_KRA).minute % 10 == 9):
-        time.sleep(20)
+if __name__ == "__main__":
     main()
-    time.sleep(9*60)
+    while True:
+        if datetime.now(time_zone_KRA).hour == 23:
+            logger.info("23 hours, waiting...")
+            time.sleep(7*60*60)
+            logger.info("Wake up an start working.")
+
+        while not(datetime.now(time_zone_KRA).minute % 10 == 9):
+            time.sleep(20)
+        main()
+        time.sleep(9*60)
