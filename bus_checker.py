@@ -10,26 +10,9 @@ import os.path
 import logging
 import configparser
 
-config = configparser.ConfigParser()
-config.read("config.ini")
-
-logger = logging.getLogger("bus")
-logger.setLevel(logging.DEBUG)
-    
-# create the logging file handler
-fh = logging.FileHandler("log.log", mode='w')
-
-formatter = logging.Formatter('%(message)s - %(levelname)s')
-fh.setFormatter(formatter)
-
-# add handler to logger object
-logger.addHandler(fh)
-
-time_zone_KRA = pytz.timezone('Asia/Krasnoyarsk') 
-
 def main():
-    data_processing(request_html(f"https://na-avtobus.ru/raspisanie/kya/krasnoyarsk-zhd/kya/zheleznogorsk/{datetime.now(time_zone_KRA).strftime('%Y-%m-%d')}"),"Kra-Zhe.ods")
-    data_processing(request_html(f"https://na-avtobus.ru/raspisanie/kya/zheleznogorsk/kya/krasnoyarsk-zhd/{datetime.now(time_zone_KRA).strftime('%Y-%m-%d')}"),"Zhe-Kra.ods")
+    data_processing(request_html(f"https://na-avtobus.ru/raspisanie/kya/krasnoyarsk-zhd/kya/zheleznogorsk/{datetime.now(time_zone_KRA).strftime('%Y-%m-%d')}"),config.get("Settings", "Kra-Zhe_filename"))
+    data_processing(request_html(f"https://na-avtobus.ru/raspisanie/kya/zheleznogorsk/kya/krasnoyarsk-zhd/{datetime.now(time_zone_KRA).strftime('%Y-%m-%d')}"),config.get("Settings", "Zhe-Kra_filename"))
 
 def request_html(url):
     # Отправляем запрос
@@ -130,6 +113,24 @@ def data_processing(response, spreadsheet_filename):
     save_data(depature_date, schedule_times, spreadsheet_filename)
 
 if __name__ == "__main__":
+    config = configparser.ConfigParser(interpolation=configparser.ExtendedInterpolation())
+    config.read("config.ini")
+    if not os.path.exists(config.get("Settings", "home_dir")):
+        os.makedirs(config.get("Settings", "home_dir"))
+
+    logger = logging.getLogger("bus")
+    logger.setLevel(logging.DEBUG)
+
+    # create the logging file handler
+    fh = logging.FileHandler(config.get("Settings", "log_file"), mode='w')
+
+    formatter = logging.Formatter('%(message)s - %(levelname)s')
+    fh.setFormatter(formatter)
+
+    # add handler to logger object
+    logger.addHandler(fh)
+
+    time_zone_KRA = pytz.timezone('Asia/Krasnoyarsk')
     main()
     while True:
         if datetime.now(time_zone_KRA).hour == 23:

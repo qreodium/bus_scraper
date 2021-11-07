@@ -1,0 +1,20 @@
+11/07/21 21:15:25 Loading or create schedule for tickets: 1 - DEBUG
+This schedule: {'23:30': None} - DEBUG
+11/07/21 21:15:25 Dep.date: 23:30  Check! - DEBUG
+11/07/21 21:15:25 Creating file bus_analytics.ods - DEBUG
+07 ноя:
++------------+
+| 23:30      |
++------------+
+| check_time |
++------------+ - DEBUG
+11/07/21 21:15:27 Loading or create schedule for tickets: 1 - DEBUG
+This schedule: {'21:30': None} - DEBUG
+11/07/21 21:15:27 Dep.date: 21:30  Check! - DEBUG
+11/07/21 21:15:27 Creating file bus_analytics.ods - DEBUG
+07 ноя:
++------------+
+| 21:30      |
++------------+
+| check_time |
++------------+ - DEBUG
