@@ -11,6 +11,18 @@ import logging
 import configparser
 
 def main():
+    while True:
+        if datetime.now(time_zone_KRA).hour == 23:
+            logger.info("23 hours, waiting...")
+            time.sleep(7*60*60)
+            logger.info("Wake up an start working.")
+
+        while not(datetime.now(time_zone_KRA).minute % 10 == 9):
+            time.sleep(20)
+        start_scrap()
+        time.sleep(9*60)
+
+def start_scrap():
     data_processing(
         request_html(f"https://na-avtobus.ru/raspisanie/kya/krasnoyarsk-zhd/kya/zheleznogorsk/{datetime.now(time_zone_KRA).strftime('%Y-%m-%d')}"),
         config.get("Settings", "Kra-Zhe_filename"))
@@ -125,7 +137,6 @@ if __name__ == "__main__":
 
     # create the logging file handler
     fh = logging.FileHandler(config.get("Settings", "log_file"), mode='w')
-
     formatter = logging.Formatter('%(message)s - %(levelname)s')
     fh.setFormatter(formatter)
 
@@ -133,14 +144,7 @@ if __name__ == "__main__":
     logger.addHandler(fh)
 
     time_zone_KRA = pytz.timezone('Asia/Krasnoyarsk')
-    main()
-    while True:
-        if datetime.now(time_zone_KRA).hour == 23:
-            logger.info("23 hours, waiting...")
-            time.sleep(7*60*60)
-            logger.info("Wake up an start working.")
-
-        while not(datetime.now(time_zone_KRA).minute % 10 == 9):
-            time.sleep(20)
+    try:
         main()
-        time.sleep(9*60)
+    except:
+        logger.exception("Error:")
