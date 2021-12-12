@@ -9,4 +9,4 @@ COPY . .
 
 ENV PYTHONUNBUFFFERED=1
 
-CMD ["sleep", "infinity"]
+CMD ["python3", "./bus_checker.py"]
